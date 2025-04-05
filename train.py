@@ -17,8 +17,8 @@ import ipdb
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
-                    default='xxx/data/ACDC', help='root dir for data')
-parser.add_argument('--output', type=str, default='xxx/output/sam/results_ssl')
+                    default='data/ACDC', help='root dir for data')
+parser.add_argument('--output', type=str, default='output/sam/results_ssl')
 parser.add_argument('--dataset', type=str,
                     default='ACDC', help='experiment_name')
 parser.add_argument('--num_classes', type=int,   # the number of foreground classes
@@ -42,7 +42,7 @@ parser.add_argument('--seed', type=int,
                     default=1337, help='random seed')
 parser.add_argument('--vit_name', type=str,
                     default='vit_b_dualmask_same_prompt_class_random_large', help='select one vit model')
-parser.add_argument('--ckpt', type=str, default='xxx/sam_vit_b_01ec64.pth',
+parser.add_argument('--ckpt', type=str, default='ckpt/sam_vit_b_01ec64.pth',
                     help='Pretrained checkpoint')
 parser.add_argument('--lora_ckpt', type=str, default=None, help='Finetuned lora checkpoint')
 parser.add_argument('--rank', type=int, default=4, help='Rank for LoRA adaptation')
