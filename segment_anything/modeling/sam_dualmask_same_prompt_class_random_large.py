@@ -171,7 +171,7 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
             )
 
             # generate prompts based on the coarse prediction
-            points_prompt, points_prompt_random, box_prompt, mask_prompt = self.prompt_generate_random_fast(low_res_masks2, image_size, True) 
+            points_prompt, points_prompt_random, box_prompt, mask_prompt = self.prompt_generate_random_fast(low_res_masks2, image_size, True)
 
             if prompt == 'point':
                 sparse_embeddings, dense_embeddings = self.prompt_encoder(
@@ -421,11 +421,18 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
         coarse_mask_np = coarse_mask_np.detach().cpu().numpy()
 
         # points: BxNx2 tensor & boxes
-        points_prompt = np.zeros([b, num_class, 2])
-        points_label = np.zeros([b, num_class])
-        points_prompt_random = np.zeros([b, num_class, 2])
+        # points_prompt = np.zeros([b, num_class, 2])
+        # points_label = np.zeros([b, num_class])
+        # points_prompt_random = np.zeros([b, num_class, 2])
+        num_points = np.random.randint(1, 3, num_class)
+        cum_num_points = np.concatenate([np.zeros(1, dtype=np.int64), np.cumsum(num_points)])
+        total_points = np.sum(num_points)
+        points_prompt = np.zeros([b, total_points, 2])
+        points_label = np.zeros([b, total_points])
+        points_prompt_random = np.zeros([b, total_points, 2])
         for idx in range(b):  # iterate over each image
             for cls in range(num_class): # find points for each class
+                cls_slice = slice(cum_num_points[cls], cum_num_points[cls + 1])
                 # obtain the binary mask
                 mask_cls = (coarse_mask_np[idx] == cls).astype(np.uint8)
                 if mask_cls.max() > 0:
@@ -448,8 +455,11 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
                     
                     if israndom:  
                         cY_r, cX_r = np.where(binary_msk==1)
-                        random_idx = np.random.randint(0, len(cX_r))
-                        points_prompt_random[idx,cls,0], points_prompt_random[idx,cls,1] = int(cX_r[random_idx]), int(cY_r[random_idx])
+                        # random_idx = np.random.randint(0, len(cX_r))
+                        # points_prompt_random[idx,cls,0], points_prompt_random[idx,cls,1] = int(cX_r[random_idx]), int(cY_r[random_idx])
+                        random_idx = np.random.randint(0, len(cX_r), num_points[cls])
+                        random_coords = np.stack([cX_r[random_idx], cY_r[random_idx]], axis=1)
+                        points_prompt_random[idx, cls_slice] = random_coords
 
                     # Calculates the distance to the closest zero pixel for each pixel of the source image.
                     # Ref from RITM: https://github.com/SamsungLabs/ritm_interactive_segmentation/blob/aa3bb52a77129e477599b5edfd041535bc67b259/isegm/data/points_sampler.py
@@ -457,17 +467,21 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
                     # NOTE: SAM and opencv have the same definition
                     padded_mask = np.uint8(np.pad(binary_msk, ((1, 1), (1, 1)), 'constant'))
                     dist_img = cv2.distanceTransform(padded_mask, distanceType=cv2.DIST_L2, maskSize=5).astype(np.float32)[1:-1, 1:-1]
+                    # cY, cX = np.where(dist_img==dist_img.max())
+                    # random_idx = np.random.randint(0, len(cX))
+                    # points_prompt[idx,cls,0], points_prompt[idx,cls,1] = int(cX[random_idx]), int(cY[random_idx])
                     cY, cX = np.where(dist_img==dist_img.max())
-                    random_idx = np.random.randint(0, len(cX))
-                    points_prompt[idx,cls,0], points_prompt[idx,cls,1] = int(cX[random_idx]), int(cY[random_idx])
+                    random_idx = np.random.randint(0, len(cX), num_points[cls])
+                    center_coords = np.stack([cX[random_idx], cY[random_idx]], axis=1)
+                    points_prompt[idx, cls_slice] = center_coords
                     
                     if cls > 0:
-                        points_label[idx,cls] = cls
+                        points_label[idx, cls_slice] = cls
                 
                 else:
-                    points_prompt[idx,cls,0], points_prompt[idx,cls,1] = points_prompt[idx,0,0], points_prompt[idx,0,1]
-                    points_prompt_random[idx,cls,0], points_prompt_random[idx,cls,1] = points_prompt[idx,0,0], points_prompt[idx,0,1]
-                    points_label[idx,cls] = 0
+                    points_prompt[idx,cls_slice,0], points_prompt[idx,cls_slice,1] = points_prompt[idx,0,0], points_prompt[idx,0,1]
+                    points_prompt_random[idx,cls_slice,0], points_prompt_random[idx,cls_slice,1] = points_prompt[idx,0,0], points_prompt[idx,0,1]
+                    points_label[idx,cls_slice] = 0
 
         points_prompt = torch.tensor(points_prompt).to(coarse_mask.device)
         points_label = torch.tensor(points_label).to(coarse_mask.device)
