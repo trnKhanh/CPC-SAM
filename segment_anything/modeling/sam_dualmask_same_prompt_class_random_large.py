@@ -122,6 +122,9 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
                 sparse_embeddings, dense_embeddings = self.prompt_encoder(
                     points=points_prompt, boxes=None, masks=mask_prompt
                 )
+                sparse_embeddings_r, dense_embeddings_r = self.prompt_encoder(
+                    points=points_prompt_random, boxes=None, masks=None
+                )
             elif prompt == 'box-mask':
                 sparse_embeddings, dense_embeddings = self.prompt_encoder(
                     points=None, boxes=box_prompt, masks=mask_prompt
@@ -195,6 +198,9 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
             elif prompt == 'point-mask':
                 sparse_embeddings, dense_embeddings = self.prompt_encoder(
                     points=points_prompt, boxes=None, masks=mask_prompt
+                )
+                sparse_embeddings_r, dense_embeddings_r = self.prompt_encoder(
+                    points=points_prompt_random, boxes=None, masks=None
                 )
             elif prompt == 'box-mask':
                 sparse_embeddings, dense_embeddings = self.prompt_encoder(
@@ -482,7 +488,11 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
                     points_prompt[idx,cls_slice,0], points_prompt[idx,cls_slice,1] = points_prompt[idx,0,0], points_prompt[idx,0,1]
                     points_prompt_random[idx,cls_slice,0], points_prompt_random[idx,cls_slice,1] = points_prompt[idx,0,0], points_prompt[idx,0,1]
                     points_label[idx,cls_slice] = 0
-
+        mask_prompt = F.interpolate(
+            torch.tensor(coarse_mask_np).unsqueeze(1).float(), 
+            self.prompt_encoder.mask_input_size,
+            mode="nearest"
+        ).to(coarse_mask.device)
         points_prompt = torch.tensor(points_prompt).to(coarse_mask.device)
         points_label = torch.tensor(points_label).to(coarse_mask.device)
         points_prompt = (points_prompt, points_label)
@@ -491,6 +501,6 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
             points_prompt_random = torch.tensor(points_prompt_random).to(coarse_mask.device)
             points_prompt_random = (points_prompt_random, points_label)
 
-            return points_prompt, points_prompt_random, None, None
+            return points_prompt, points_prompt_random, None, mask_prompt 
 
-        return points_prompt, None, None
+        return points_prompt, None, mask_prompt
