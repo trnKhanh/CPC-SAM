@@ -17,7 +17,7 @@ from tqdm import tqdm
 from utils import DiceLoss, sigmoid_rampup
 from torchvision import transforms
 from icecream import ic
-from val import test_single_volume
+from val import test_single_volume, test_single_volume_prompt
 from datasets.dataset_ACDC import TwoStreamBatchSampler
 import ipdb
 from PIL import Image
@@ -225,6 +225,7 @@ def trainer_acdc_dualmask_prompt_ssl_fixcoe_random_new_mean_up(args, model, snap
     max_iterations = args.max_epochs * len(trainloader)
     logging.info("{} iterations per epoch. {} max iterations ".format(len(trainloader), max_iterations))
     best_performance = 0.0
+    best_prompt_performance = 0.0
     iterator = tqdm(range(max_epoch), ncols=70)
     for epoch_num in iterator:
         for i_batch, sampled_batch in enumerate(trainloader):
@@ -412,6 +413,43 @@ def trainer_acdc_dualmask_prompt_ssl_fixcoe_random_new_mean_up(args, model, snap
 
                 logging.info(
                     'iteration %d : mean_dice : %f mean_hd95 : %f' % (iter_num, performance, mean_hd95))
+
+                # Check to save best prompt-driven model
+                if iter_num >= args.warm_iter:
+                    metric_list = 0.0
+                    for i_batch, sampled_batch in enumerate(valloader):
+                        metric_i = test_single_volume_prompt(
+                            sampled_batch["image"], sampled_batch["label"], model, num_classes+1, 1, args.promptmode) 
+                        metric_list += np.array(metric_i)
+                    metric_list = metric_list / len(db_val)
+                    for class_i in range(num_classes):   
+                        writer.add_scalar('info/val_{}_dice'.format(class_i+1),
+                                        metric_list[class_i, 0], iter_num)
+                        writer.add_scalar('info/val_{}_hd95'.format(class_i+1),
+                                        metric_list[class_i, 1], iter_num)
+
+                    performance = np.mean(metric_list, axis=0)[0]
+
+                    mean_hd95 = np.mean(metric_list, axis=0)[1]
+                    writer.add_scalar('info/val_mean_dice', performance, iter_num)
+                    writer.add_scalar('info/val_mean_hd95', mean_hd95, iter_num)
+
+                    if performance > best_prompt_performance:
+                        best_prompt_performance = performance
+                        save_mode_path = os.path.join(snapshot_path,
+                                                    'iter_{}_dice_{}_prompt.pth'.format(
+                                                        iter_num, round(best_prompt_performance, 4)))
+                        save_best = os.path.join(snapshot_path,
+                                                'best_prompt_model.pth')
+                        try:
+                            model.save_lora_parameters(save_best)
+                            model.save_lora_parameters(save_mode_path)
+                        except:
+                            model.module.save_lora_parameters(save_best)
+                            model.module.save_lora_parameters(save_mode_path)
+
+                    logging.info(
+                        'iteration %d (prompt) : mean_dice : %f mean_hd95 : %f' % (iter_num, performance, mean_hd95))
                 model.train()
     
 
