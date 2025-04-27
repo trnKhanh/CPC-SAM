@@ -77,6 +77,7 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
     def forward_train(self, batched_input, multimask_output, image_size, prompt_idx, prompt):
         input_images = self.preprocess(batched_input)
         image_embeddings = self.image_encoder(input_images)
+        feature_dropout_rate = 0.5
 
         if prompt_idx == 0:
             with torch.no_grad():
@@ -137,9 +138,11 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
                     points=None, boxes=None, masks=None
                 )
 
+            dropout_image_embeddings = F.dropout(image_embeddings, feature_dropout_rate, self.training)
+
 
             low_res_masks2, iou_predictions2, _ = self.mask_decoder2(
-                image_embeddings=image_embeddings,
+                image_embeddings=dropout_image_embeddings,
                 image_pe=self.prompt_encoder.get_dense_pe(),
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
@@ -147,7 +150,7 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
             )
 
             low_res_masks2_r, iou_predictions2_r, _ = self.mask_decoder2(
-                image_embeddings=image_embeddings,
+                image_embeddings=dropout_image_embeddings,
                 image_pe=self.prompt_encoder.get_dense_pe(),
                 sparse_prompt_embeddings=sparse_embeddings_r,
                 dense_prompt_embeddings=dense_embeddings,
@@ -214,8 +217,10 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
                     points=None, boxes=None, masks=None
                 )
 
+            dropout_image_embeddings = F.dropout(image_embeddings, feature_dropout_rate, self.training)
+
             low_res_masks1, iou_predictions1, _ = self.mask_decoder1(
-                image_embeddings=image_embeddings,
+                image_embeddings=dropout_image_embeddings,
                 image_pe=self.prompt_encoder.get_dense_pe(),
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
@@ -223,7 +228,7 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
             )
 
             low_res_masks1_r, iou_predictions1_r, _ = self.mask_decoder1(
-                image_embeddings=image_embeddings,
+                image_embeddings=dropout_image_embeddings,
                 image_pe=self.prompt_encoder.get_dense_pe(),
                 sparse_prompt_embeddings=sparse_embeddings_r,
                 dense_prompt_embeddings=dense_embeddings,
