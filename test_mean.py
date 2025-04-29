@@ -73,7 +73,7 @@ def inference(args, multimask_output, db_config, model, test_save_path=None):
     avg_metric3 = np.nanmean(third_list, axis=0)
     
     # save:
-    write_csv = "xxx/output/save_excel/" + args.exp + "_test_mean.csv"
+    write_csv = f"{args.output_dir}/save_excel/" + args.exp + "_test_mean.csv"
     save = pd.DataFrame({'RV-dice':first_list[:,0], 'RV-hd95':first_list[:,1], 'RV-asd':first_list[:,2], 'RV-jc':first_list[:,3], 'Myo-dice':second_list[:,0], 'Myo-hd95':second_list[:,1], 'Myo-asd':second_list[:,2], 
     'Myo-jc':second_list[:,3], 'LV-dice':third_list[:,0], 'LV-hd95':third_list[:,1], 'LV-asd':third_list[:,2], 'LV-jc':third_list[:,3]})
     save.to_csv(write_csv, index=False, sep=',')  
@@ -97,7 +97,7 @@ def config_to_dict(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root_path', type=str,
-                    default='xxx/data/ACDC', help='Name of Experiment')
+                    default='data/ACDC', help='Name of Experiment')
     parser.add_argument('--config', type=str, default=None, help='The config file provided by the trained model')
     parser.add_argument('--dataset', type=str, default='ACDC', help='Experiment name')
     parser.add_argument('--num_classes', type=int, default=3)
