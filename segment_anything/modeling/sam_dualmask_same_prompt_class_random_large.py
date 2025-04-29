@@ -77,7 +77,7 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
     def forward_train(self, batched_input, multimask_output, image_size, prompt_idx, prompt):
         input_images = self.preprocess(batched_input)
         image_embeddings = self.image_encoder(input_images)
-        feature_dropout_rate = 0.5
+        feature_dropout_rate = 0.2
 
         if prompt_idx == 0:
             with torch.no_grad():
