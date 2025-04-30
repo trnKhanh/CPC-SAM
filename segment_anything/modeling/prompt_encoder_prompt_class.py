@@ -42,9 +42,11 @@ class PromptEncoder_prompt_class(nn.Module):
         self.image_embedding_size = image_embedding_size
         self.pe_layer = PositionEmbeddingRandom(embed_dim // 2)
 
-        self.num_point_embeddings: int = 4 + 2  # pos/neg point + 2 box corners
-        point_embeddings = [nn.Embedding(1, embed_dim) for i in range(self.num_point_embeddings)]
+        self.num_classes = 4
+        point_embeddings = [nn.Embedding(1, embed_dim) for i in range(self.num_classes)]
         self.point_embeddings = nn.ModuleList(point_embeddings)
+        box_corner_embeddings = [nn.Embedding(1, embed_dim) for i in range(self.num_classes * 2)]
+        self.box_corner_embeddings = nn.ModuleList(box_corner_embeddings)
         self.not_a_point_embed = nn.Embedding(1, embed_dim)
 
         self.mask_input_size = (4 * image_embedding_size[0], 4 * image_embedding_size[1])
@@ -91,26 +93,41 @@ class PromptEncoder_prompt_class(nn.Module):
         point_embedding[labels == 2] += self.point_embeddings[2].weight
         point_embedding[labels == 3] += self.point_embeddings[3].weight
         return point_embedding
+    #
+    # def _embed_boxes(self, boxes: torch.Tensor) -> torch.Tensor:
+    #     """Embeds box prompts."""
+    #     boxes = boxes + 0.5  # Shift to center of pixel
+    #     _, c, _ = boxes.shape
+    #     if c == 1:
+    #         coords = boxes.reshape(-1, 2, 2)
+    #         corner_embedding = self.pe_layer.forward_with_coords(coords, self.input_image_size)
+    #         corner_embedding[:, 0, :] += self.point_embeddings[-2].weight
+    #         corner_embedding[:, 1, :] += self.point_embeddings[-1].weight
+    #     else:
+    #         coords = boxes[:,0,:].reshape(-1, 2, 2)
+    #         corner_embedding = self.pe_layer.forward_with_coords(coords, self.input_image_size)
+    #         corner_embedding[:, 0, :] += self.point_embeddings[-2].weight
+    #         corner_embedding[:, 1, :] += self.point_embeddings[-1].weight
+    #
+    #         for i in range(1,c):
+    #             coords = boxes[:,i,:].reshape(-1, 2, 2)
+    #             corner_embedding += self.pe_layer.forward_with_coords(coords, self.input_image_size)
+    #             
+    #     return corner_embedding
 
-    def _embed_boxes(self, boxes: torch.Tensor) -> torch.Tensor:
+    def _embed_boxes(self, boxes: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         """Embeds box prompts."""
         boxes = boxes + 0.5  # Shift to center of pixel
-        _, c, _ = boxes.shape
-        if c == 1:
-            coords = boxes.reshape(-1, 2, 2)
-            corner_embedding = self.pe_layer.forward_with_coords(coords, self.input_image_size)
-            corner_embedding[:, 0, :] += self.point_embeddings[-2].weight
-            corner_embedding[:, 1, :] += self.point_embeddings[-1].weight
-        else:
-            coords = boxes[:,0,:].reshape(-1, 2, 2)
-            corner_embedding = self.pe_layer.forward_with_coords(coords, self.input_image_size)
-            corner_embedding[:, 0, :] += self.point_embeddings[-2].weight
-            corner_embedding[:, 1, :] += self.point_embeddings[-1].weight
-
-            for i in range(1,c):
-                coords = boxes[:,i,:].reshape(-1, 2, 2)
-                corner_embedding += self.pe_layer.forward_with_coords(coords, self.input_image_size)
+        b, n, _, _ = boxes.shape
+        coords = boxes.reshape(b, n * 2, 2)
+        corner_embedding = self.pe_layer.forward_with_coords(coords, self.input_image_size)
+        corner_embedding = corner_embedding.reshape(b, n, 2, self.embed_dim)
+        for c in range(self.num_classes):
+            corner_embedding[:, :, 0, :][labels == c] += self.box_corner_embeddings[c].weight
+            corner_embedding[:, :, 1, :][labels == c] += self.box_corner_embeddings[c + self.num_classes].weight
                 
+        corner_embedding = corner_embedding.reshape(b, n * 2, self.embed_dim)
+
         return corner_embedding
 
     def _embed_masks(self, masks: torch.Tensor) -> torch.Tensor:
@@ -121,7 +138,7 @@ class PromptEncoder_prompt_class(nn.Module):
     def _get_batch_size(
         self,
         points: Optional[Tuple[torch.Tensor, torch.Tensor]],
-        boxes: Optional[torch.Tensor],
+        boxes: Optional[Tuple[torch.Tensor, torch.Tensor]],
         masks: Optional[torch.Tensor],
     ) -> int:
         """
@@ -130,7 +147,7 @@ class PromptEncoder_prompt_class(nn.Module):
         if points is not None:
             return points[0].shape[0]
         elif boxes is not None:
-            return boxes.shape[0]
+            return boxes[0].shape[0]
         elif masks is not None:
             return masks.shape[0]
         else:
@@ -142,7 +159,7 @@ class PromptEncoder_prompt_class(nn.Module):
     def forward(
         self,
         points: Optional[Tuple[torch.Tensor, torch.Tensor]],
-        boxes: Optional[torch.Tensor],
+        boxes: Optional[Tuple[torch.Tensor, torch.Tensor]],
         masks: Optional[torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -169,7 +186,8 @@ class PromptEncoder_prompt_class(nn.Module):
             point_embeddings = self._embed_points(coords, labels, pad=(boxes is None))
             sparse_embeddings = torch.cat([sparse_embeddings, point_embeddings], dim=1)  
         if boxes is not None:
-            box_embeddings = self._embed_boxes(boxes)
+            coords, labels = boxes
+            box_embeddings = self._embed_boxes(coords, labels)
             sparse_embeddings = torch.cat([sparse_embeddings, box_embeddings], dim=1)
 
         if masks is not None:
