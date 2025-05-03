@@ -5,6 +5,8 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+import itertools
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -78,6 +80,11 @@ class Sam_dualmask_same_prompt_class_random_large(nn.Module):
         input_images = self.preprocess(batched_input)
         image_embeddings = self.image_encoder(input_images)
         feature_dropout_rate = 0.0
+
+        if prompt_idx >= 0:
+            prompt_iter = itertools.cycle(prompt)
+            for i in range(prompt_idx + 1):
+                prompt = next(prompt_iter)
 
         if prompt_idx == 0:
             with torch.no_grad():

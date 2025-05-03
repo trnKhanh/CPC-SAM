@@ -55,7 +55,7 @@ parser.add_argument('--dice_param', type=float, default=0.8)
 parser.add_argument('--labeled_num', type=int, default=1,help='labeled data')  # determine the number of labeled data
 parser.add_argument('--warm_iter', type=int, default=5000,help='labeled data') 
 parser.add_argument('--method', type=str, default='ssl_dualmask_same_warm5000_pointprompt_new_fixcoe_class_random_new_c2_mean_large_A40_20240219')
-parser.add_argument('--promptmode', type=str, default='point',help='prompt')
+parser.add_argument('--promptmode', type=str, default='point',help='prompt', nargs="+")
 
 parser.add_argument('--consistency', type=float,
                     default=0.1, help='consistency')
