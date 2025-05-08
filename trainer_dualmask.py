@@ -6,8 +6,7 @@ import sys
 import time
 import math
 import numpy as np
-import torch
-import torch.nn as nn
+import torch import torch.nn as nn
 import torch.optim as optim
 from tensorboardX import SummaryWriter
 from torch.nn.modules.loss import CrossEntropyLoss
